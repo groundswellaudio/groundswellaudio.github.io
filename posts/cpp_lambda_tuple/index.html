@@ -55,7 +55,7 @@
 		
 
 		<p>If you&rsquo;ve ever peeked at one implementation of std::tuple, you&rsquo;ve probably witnessed a fireworks of templates and recursion. The core logic of this thing isn&rsquo;t very complex, but the resulting code is pretty awful to look at.</p>
-<p>In this post I&rsquo;m going to show how to implement a tuple using only a single lambda as memory. I originally did that out of curiosity, but this implementation also turned out to compile very quickly.</p>
+<p>In this post I&rsquo;m going to show how to implement a tuple using only a single lambda as memory. I originally did that out of curiosity, but this implementation also turned out to compiles very quickly.</p>
 <h2 id="behold-the-lambda-tuple">Behold, the lambda-tuple</h2>
 <p>We need to store a pack of heterogenous variables, and apply arbitrary functions to it. That&rsquo;s pretty much the requirements of a tuple. Using a lambda, we can satisfy these requirements in about 2 lines :</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
@@ -65,7 +65,7 @@
 	<span class="p">};</span>
 <span class="p">}</span>
 </code></pre></div><blockquote>
-<p>Note : we need <code>mutable</code> here to be able to modify our variables, and <code>decltype(auto)</code> to be able to return both references or nothing at all, since the incoming function might return nothing.</p>
+<p>Note : we need <code>mutable</code> here to be able to modify our variables, and <code>decltype(auto)</code> to be able to return both references or nothing at all, since the incoming function might returns nothing.</p>
 </blockquote>
 <p>And here we go! A glorious tuple. We can use it as follow :</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">auto</span> <span class="n">tpl</span> <span class="o">=</span> <span class="n">make_lambda_tuple</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mf">4.f</span><span class="p">,</span> <span class="s">&#34;hello&#34;</span><span class="p">);</span>
@@ -105,7 +105,7 @@
 <p><em>Note : i&rsquo;ll be mostly omitting the boring stuff like forwarding, noexcept, etc.</em></p>
 </blockquote>
 <h2 id="member-look-up">Member look-up</h2>
-<p>Any self-respecting tuple can <code>get</code> its members by index and type, so let&rsquo;s add that. For the type-based look-up, we&rsquo;ll use an helper function to find the index of the requested type, because const/ref qualifiers  make things difficult when comparing types directly :</p>
+<p>Any self-respecting tuple can <code>get</code> its members by index and type, so let&rsquo;s add that. For the type-based look-up, we&rsquo;ll use a helper function to find the index of the requested type, because const/ref qualifiers  make things difficult when comparing types directly :</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">size_t</span> <span class="n">Clk</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Head</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
 <span class="k">auto</span><span class="o">&amp;&amp;</span> <span class="n">tuple_getter_index</span><span class="p">(</span><span class="n">Head</span><span class="o">&amp;&amp;</span> <span class="n">head</span><span class="p">,</span> <span class="n">Args</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">args</span><span class="p">){</span>
 	<span class="k">if</span> <span class="nf">constexpr</span> <span class="p">(</span><span class="n">Clk</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span> <span class="k">decltype</span><span class="p">(</span><span class="n">head</span><span class="p">)(</span><span class="n">head</span><span class="p">);</span>
@@ -154,12 +154,12 @@ reference from our tuple, so I kept it.</p>
 
 <span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">tpl</span><span class="p">)</span> <span class="o">=</span> <span class="mi">314</span><span class="p">;</span>
 <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">a</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; &#34;</span> <span class="o">&lt;&lt;</span> <span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">tpl</span><span class="p">);</span>
-</code></pre></div><p>This code output <code>3 314</code>, which is not what we want. To understand why, let&rsquo;s look at the definition of <code>make_lambda_tuple</code>:</p>
+</code></pre></div><p>This code outputs <code>3 314</code>, which is not what we want. To understand why, let&rsquo;s look at the definition of <code>make_lambda_tuple</code>:</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
 <span class="k">auto</span> <span class="n">make_lambda_tuple</span><span class="p">(</span><span class="n">Args</span><span class="p">...</span> <span class="n">args</span><span class="p">){</span>
 	<span class="k">return</span> <span class="p">[</span><span class="n">args</span><span class="p">...]</span> <span class="cm">/* &lt;- here&#39;s the culprit! */</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span> <span class="p">...</span>
 	
-</code></pre></div><p>We&rsquo;re capturing our variables by values, which means that our tuple doesn&rsquo;t contains references at all, but just values  constructed with references. Lambda capture syntax doesn&rsquo;t allow to just choose between capturing by values or by references inside of a pack - but the solution is very easy. We need to wrap our variables with an helper type :</p>
+</code></pre></div><p>We&rsquo;re capturing our variables by values, which means that our tuple doesn&rsquo;t contains references at all, but just values constructed with references. Lambda capture syntax doesn&rsquo;t allow to just choose between capturing by values or by references inside of a pack - but the solution is simple (simple in a C++ kind of way). We need to wrap our variables with a helper type :</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
 <span class="k">struct</span> <span class="nc">element_wrapper</span> <span class="p">{</span>
 	<span class="n">T</span> <span class="n">value</span><span class="p">;</span>
@@ -198,7 +198,7 @@ reference from our tuple, so I kept it.</p>
 	<span class="c1">//...
 </span><span class="c1"></span><span class="p">};</span>
 </code></pre></div><p>As far as I&rsquo;m aware, this isn&rsquo;t undefined behavior : we&rsquo;re removing the const-qualifier, but we&rsquo;re never actually modifying <code>other</code>, so it&rsquo;s all good.</p>
-<p>But we need to provide an <code>apply</code> function that works with const tuples, so we must generalize this. We can do so by moving the implementation of <code>apply</code> into overloaded private methods :</p>
+<p>But we need to provide a <code>apply</code> function that works with const tuples, so we must generalize this. We can do so by moving the implementation of <code>apply</code> into overloaded private methods :</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp">
 <span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Ts</span><span class="o">&gt;</span>
 <span class="k">class</span> <span class="nc">tuple</span> <span class="p">{</span>
@@ -373,7 +373,7 @@ reference from our tuple, so I kept it.</p>
         		<footer>
 			
 			<span>
-			&copy; <time datetime="2021-02-01 17:37:11.386337 &#43;0100 CET m=&#43;0.126211612">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
+			&copy; <time datetime="2021-02-01 17:47:47.512721 &#43;0100 CET m=&#43;0.123946081">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
 			</span>
 		</footer>
 

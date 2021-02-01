@@ -14,7 +14,7 @@
       
       <guid>https://groundswellaudio.github.io/posts/cpp_lambda_tuple/</guid>
       <description>If you&amp;rsquo;ve ever peeked at one implementation of std::tuple, you&amp;rsquo;ve probably witnessed a fireworks of templates and recursion. The core logic of this thing isn&amp;rsquo;t very complex, but the resulting code is pretty awful to look at.
-In this post I&amp;rsquo;m going to show how to implement a tuple using only a single lambda as memory. I originally did that out of curiosity, but this implementation also turned out to compile very quickly.</description>
+In this post I&amp;rsquo;m going to show how to implement a tuple using only a single lambda as memory. I originally did that out of curiosity, but this implementation also turned out to compiles very quickly.</description>
     </item>
     
   </channel>
