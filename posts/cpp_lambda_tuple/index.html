@@ -286,7 +286,8 @@ reference from our tuple, so I kept it.</p>
 <span class="k">auto</span> <span class="n">tuple_cat_tail</span><span class="p">(</span><span class="n">Builder</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">,</span> <span class="n">Head</span><span class="o">&amp;&amp;</span> <span class="n">head</span><span class="p">,</span> <span class="n">Tail</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">tail</span><span class="p">){</span>
 	<span class="k">return</span> <span class="nf">tuple_cat_tail</span><span class="p">(</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">fn</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">head</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">pack</span><span class="p">)</span> 
 	<span class="p">{</span>
-		<span class="k">return</span> <span class="n">apply</span><span class="p">(</span><span class="n">head</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">head_mem</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="n">apply</span><span class="p">(</span><span class="n">head</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">head_mem</span><span class="p">)</span> 
+		<span class="p">{</span>
 			<span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="n">head_mem</span><span class="p">...,</span> <span class="n">pack</span><span class="p">...);</span>
 		<span class="p">});</span>
 	<span class="p">},</span> <span class="n">tail</span><span class="p">...</span> <span class="p">);</span>
@@ -295,9 +296,11 @@ reference from our tuple, so I kept it.</p>
 <span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">A</span><span class="p">,</span> <span class="k">class</span> <span class="nc">B</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Tail</span><span class="o">&gt;</span>
 <span class="k">auto</span> <span class="n">tuple_cat</span><span class="p">(</span><span class="n">A</span><span class="o">&amp;&amp;</span> <span class="n">a</span><span class="p">,</span> <span class="n">B</span><span class="o">&amp;&amp;</span> <span class="n">b</span><span class="p">,</span> <span class="n">Tail</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">tail</span><span class="p">){</span>
 	<span class="k">using</span> <span class="n">ReturnType</span> <span class="o">=</span> <span class="n">list_cat_t</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">A</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">B</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">Tail</span><span class="o">&gt;</span><span class="p">...</span><span class="o">&gt;</span><span class="p">;</span>
-	<span class="k">return</span> <span class="nf">tuple_cat_tail</span><span class="p">(</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">a</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">pack</span><span class="p">)</span> <span class="p">{</span>
-		<span class="k">return</span> <span class="n">apply</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">a_mem</span> <span class="p">)</span> <span class="p">{</span>
-			<span class="k">return</span> <span class="n">ReturnType</span><span class="p">{</span><span class="n">a_mem</span><span class="p">...,</span> <span class="n">pack</span><span class="p">...);</span>
+	<span class="k">return</span> <span class="nf">tuple_cat_tail</span><span class="p">(</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">a</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">pack</span><span class="p">)</span> 
+	<span class="p">{</span>
+		<span class="k">return</span> <span class="n">apply</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">a_mem</span> <span class="p">)</span> 
+		<span class="p">{</span>
+			<span class="k">return</span> <span class="n">ReturnType</span><span class="p">{</span><span class="n">a_mem</span><span class="p">...,</span> <span class="n">pack</span><span class="p">...};</span>
 		<span class="p">});</span>
 	<span class="p">},</span>  <span class="n">b</span><span class="p">,</span> <span class="n">tail</span><span class="p">...</span> <span class="p">);</span>
 <span class="p">}</span>
@@ -373,7 +376,7 @@ reference from our tuple, so I kept it.</p>
         		<footer>
 			
 			<span>
-			&copy; <time datetime="2021-02-01 20:46:54.31151 &#43;0100 CET m=&#43;0.135708965">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
+			&copy; <time datetime="2021-02-01 20:53:23.508152 &#43;0100 CET m=&#43;0.120674523">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
 			</span>
 		</footer>
 
