@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+		<title>[C&#43;&#43;] Making a tuple with a lambda &middot; Groundswell Audio</title>
+
+		
+  		<link rel="stylesheet" href="/css/style.css">
+		<link rel="stylesheet" href="/css/fonts.css">
+		
+		<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+		<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+		<link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+
+		
+		<link href="" rel="alternate" type="application/rss+xml" title="Groundswell Audio" />
+	</head>
+
+    <body>
+        		<nav class="nav">
+			<div class="nav-container">
+				<a href="/">
+					<h2 class="nav-title">Groundswell Audio</h2>
+				</a>
+				<ul>
+    
+    
+        <li>
+            <a href="/about">
+                
+                <span>About</span>
+                
+            </a>
+        </li>
+    
+</ul>
+			</div>
+		</nav>
+
+        
+
+<main>
+	<div class="post">
+		<div class="post-info">
+     
+        <br>
+        <span>on&nbsp;</span><time datetime="2021-01-31 23:30:05 &#43;0100 CET">January 31, 2021</time>
+</div>
+
+		<h1 class="post-title">[C&#43;&#43;] Making a tuple with a lambda</h1>
+<div class="post-line"></div>
+
+		
+
+		<p>If you&rsquo;ve ever peeked at one implementation of std::tuple, you&rsquo;ve probably witnessed a fireworks of templates and recursion. The core logic of this thing isn&rsquo;t very complex, but the resulting code is pretty awful to look at.</p>
+<p>In this post I&rsquo;m going to show how to implement a tuple using only a single lambda as memory. I originally did that out of curiosity, but this implementation also turned out to compile very quickly.</p>
+<h2 id="behold-the-lambda-tuple">Behold, the lambda-tuple</h2>
+<p>We need to store a pack of heterogenous variables, and apply arbitrary functions to it. That&rsquo;s pretty much the requirements of a tuple. Using a lambda, we can satisfy these requirements in about 2 lines :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">make_lambda_tuple</span><span class="p">(</span><span class="n">Args</span><span class="p">...</span> <span class="n">args</span><span class="p">){</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">args</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span> <span class="k">mutable</span> <span class="o">-&gt;</span> <span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nf">fn</span><span class="p">(</span><span class="n">args</span><span class="p">...);</span>
+	<span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div><blockquote>
+<p>Note : we need <code>mutable</code> here to be able to modify our variables, and <code>decltype(auto)</code> to be able to return lvalues references, otherwise we would be returning temporaries.</p>
+</blockquote>
+<p>And here we go! A glorious tuple. We can use it as follow :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">auto</span> <span class="n">tpl</span> <span class="o">=</span> <span class="n">make_lambda_tuple</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mf">4.f</span><span class="p">,</span> <span class="s">&#34;hello&#34;</span><span class="p">);</span>
+
+<span class="k">auto</span> <span class="n">printer</span> <span class="o">=</span> <span class="p">[]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="p">...</span> <span class="n">args</span><span class="p">)</span> <span class="p">{</span>
+	<span class="p">((</span><span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">args</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; &#34;</span><span class="p">),</span> <span class="p">...);</span>
+<span class="p">};</span>
+
+<span class="n">tpl</span><span class="p">(</span> <span class="n">printer</span> <span class="p">);</span>
+</code></pre></div><p><code>Output : 3 4 hello</code></p>
+<p>This was easy. The interface of this thing isn&rsquo;t that great, though. So before going further, let&rsquo;s wrap this into a class, and add a <code>apply</code> function that we&rsquo;re getting for free :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Ts</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">tuple</span> <span class="p">{</span>
+	<span class="k">public</span> <span class="o">:</span> 
+	
+	<span class="n">tuple</span><span class="p">()</span> <span class="k">requires</span> <span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">is_default_constructible</span><span class="o">&lt;</span><span class="n">Ts</span><span class="o">&gt;</span> <span class="o">||</span> <span class="p">...)</span> 
+	<span class="o">:</span> <span class="n">memfn</span><span class="p">(</span> <span class="n">make_lambda_tuple</span><span class="o">&lt;</span><span class="n">Ts</span><span class="p">...</span><span class="o">&gt;</span><span class="p">(</span><span class="n">Ts</span><span class="p">{}...)</span> <span class="p">)</span>
+	<span class="p">{}</span>
+	
+	<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+	<span class="n">tuple</span><span class="p">(</span><span class="n">Args</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">args</span><span class="p">)</span> <span class="o">:</span> <span class="n">memfn</span><span class="p">(</span><span class="n">make_lambda_tuple</span><span class="o">&lt;</span><span class="n">Ts</span><span class="p">...</span><span class="o">&gt;</span><span class="p">(</span><span class="n">args</span><span class="p">...))</span> <span class="p">{}</span>
+	
+	<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Self</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Fn</span><span class="o">&gt;</span>
+	<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="k">friend</span> <span class="n">apply</span><span class="p">;</span>
+	
+	<span class="k">private</span> <span class="o">:</span> 
+	<span class="k">decltype</span><span class="p">(</span>
+		<span class="n">make_lambda_tuple</span><span class="o">&lt;</span><span class="n">Ts</span><span class="p">...</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">declval</span><span class="o">&lt;</span><span class="n">Ts</span><span class="o">&gt;</span><span class="p">()...)</span>
+	<span class="p">)</span> <span class="n">memfn</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Self</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Fn</span><span class="o">&gt;</span>
+<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">apply</span><span class="p">(</span><span class="n">Self</span><span class="o">&amp;&amp;</span> <span class="n">s</span><span class="p">,</span> <span class="n">Fn</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">){</span>
+	<span class="k">return</span> <span class="n">s</span><span class="p">.</span><span class="n">memfn</span><span class="p">(</span><span class="n">fn</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div><blockquote>
+<p><em>Note : i&rsquo;ll be mostly omitting the boring stuff like forwarding, noexcept, etc.</em></p>
+</blockquote>
+<h2 id="member-look-up">Member look-up</h2>
+<p>Any self-respecting tuple can <code>get</code> its members by index and type, so let&rsquo;s add that. For the type-based look-up, we&rsquo;ll use an helper function to find the index of the requested type, because const/ref qualifiers  make things difficult when comparing types directly :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">size_t</span> <span class="n">Clk</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Head</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">auto</span><span class="o">&amp;&amp;</span> <span class="n">tuple_getter_index</span><span class="p">(</span><span class="n">Head</span><span class="o">&amp;&amp;</span> <span class="n">head</span><span class="p">,</span> <span class="n">Args</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">args</span><span class="p">){</span>
+	<span class="k">if</span> <span class="nf">constexpr</span> <span class="p">(</span><span class="n">Clk</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span> <span class="k">decltype</span><span class="p">(</span><span class="n">head</span><span class="p">)(</span><span class="n">head</span><span class="p">);</span>
+	<span class="k">else</span> <span class="k">return</span> <span class="n">tuple_getter_index</span><span class="o">&lt;</span><span class="n">Clk</span> <span class="o">-</span> <span class="mi">1</span><span class="o">&gt;</span><span class="p">(</span><span class="k">decltype</span><span class="p">(</span><span class="n">args</span><span class="p">)(</span><span class="n">args</span><span class="p">)...);</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">size_t</span> <span class="n">Clk</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Wanted</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Head</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">constexpr</span> <span class="n">get_index_of_type</span><span class="p">(){</span>
+	<span class="k">if</span> <span class="nf">constexpr</span> <span class="p">(</span> <span class="n">std</span><span class="o">::</span><span class="n">is_same_v</span><span class="o">&lt;</span><span class="n">Wanted</span><span class="p">,</span> <span class="n">Head</span><span class="o">&gt;</span> <span class="p">)</span> <span class="k">return</span> <span class="n">Clk</span><span class="p">;</span>
+	<span class="k">else</span> <span class="k">return</span> <span class="n">get_index_of_type</span><span class="o">&lt;</span><span class="n">Clk</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">Wanted</span><span class="p">,</span> <span class="n">Args</span><span class="p">...</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div><blockquote>
+<p>I said I would be ommiting forwarding, however returning the forwarded <code>head</code> is necessary to extract a rvalue
+reference from our tuple, so I kept it.</p>
+</blockquote>
+<p>And now we can add that to our class :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Ts</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">tuple</span> <span class="p">{</span>
+	<span class="k">public</span> <span class="o">:</span> 
+	
+	<span class="c1">//... 
+</span><span class="c1"></span>	
+	<span class="k">template</span> <span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">size_t</span> <span class="n">N</span><span class="o">&gt;</span>
+	<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">get</span><span class="p">(){</span>
+		<span class="k">return</span> <span class="nf">apply</span><span class="p">(</span><span class="o">*</span><span class="k">this</span><span class="p">,</span> <span class="p">[]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="p">{</span> 
+			<span class="k">return</span> <span class="n">tuple_getter_index</span><span class="o">&lt;</span><span class="n">N</span><span class="o">&gt;</span><span class="p">(</span> <span class="n">args</span><span class="p">...</span> <span class="p">);</span>
+		<span class="p">});</span>
+	<span class="p">}</span>
+	
+	<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+	<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">get</span><span class="p">(){</span>
+		<span class="k">return</span> <span class="n">get</span><span class="o">&lt;</span><span class="n">get_index_of_type</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">Ts</span><span class="p">...</span><span class="o">&gt;</span><span class="p">()</span><span class="o">&gt;</span><span class="p">();</span>
+	<span class="p">}</span>
+	
+	<span class="c1">//...
+</span><span class="c1"></span><span class="p">};</span>
+</code></pre></div><blockquote>
+<p>It&rsquo;s easy to forget <code>decltype(auto)</code>, especially in lambdas. If you&rsquo;re getting the &ldquo;Expression is not assignable&rdquo; kind of error, you might have forgot a <code>decltype</code> somewhere.</p>
+</blockquote>
+<p>Here we are. However, there is something we need to take care of before claiming that we have a tuple, and that thing is&hellip;</p>
+<h2 id="storing-references">Storing references</h2>
+<p>As you might have noticed, the code above has a problem : we cannot store references in our tuple.</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="kt">int</span> <span class="n">a</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">b</span> <span class="o">=</span> <span class="mf">5.f</span><span class="p">;</span>
+<span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&amp;</span><span class="p">,</span> <span class="kt">float</span><span class="o">&amp;&gt;</span> <span class="n">tpl</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">);</span>
+
+<span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">tpl</span><span class="p">)</span> <span class="o">=</span> <span class="mi">314</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">a</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; &#34;</span> <span class="o">&lt;&lt;</span> <span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">tpl</span><span class="p">);</span>
+</code></pre></div><p>This code output <code>3 314</code>, which is not what we want. To understand why, let&rsquo;s look at the definition of <code>make_lambda_tuple</code>:</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">make_lambda_tuple</span><span class="p">(</span><span class="n">Args</span><span class="p">...</span> <span class="n">args</span><span class="p">){</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">args</span><span class="p">...]</span> <span class="cm">/* &lt;- here&#39;s the culprit! */</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span> <span class="p">...</span>
+	
+</code></pre></div><p>We&rsquo;re capturing our variables by values, which means that our tuple doesn&rsquo;t contains references at all, but just values  constructed with references. Lambda capture syntax doesn&rsquo;t allow to just choose between capturing by values or by references inside of a pack - but the solution is very easy. We need to wrap our variables with an helper type :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="nc">element_wrapper</span> <span class="p">{</span>
+	<span class="n">T</span> <span class="n">value</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div><p>And change our function to :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">make_lambda_tuple</span><span class="p">(</span><span class="n">Args</span><span class="p">...</span> <span class="n">args</span><span class="p">){</span>
+	<span class="k">return</span> <span class="p">[...</span><span class="n">args</span> <span class="o">=</span> <span class="n">element_wrapper</span><span class="o">&lt;</span><span class="n">Args</span><span class="o">&gt;</span><span class="p">{</span><span class="n">args</span><span class="p">}]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span> <span class="k">mutable</span> <span class="o">-&gt;</span> <span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nf">fn</span><span class="p">(</span> <span class="n">args</span><span class="p">.</span><span class="n">value</span><span class="p">...</span> <span class="p">);</span>
+	<span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div><p><em>But how is it that easy?</em> you may ask. The trick here is that <code>Args...</code> are the template parameters of our tuple, and we are instantiating a pack of <code>element_wrapper</code> with these parameters, so if any parameter is a (lvalue or rvalue) reference, <code>element_wrapper</code> will just contains that reference. Basically, we&rsquo;re preventing decay-copy by making <code>element_wrapper</code> store the exact types requested by our tuple.</p>
+<h2 id="handling-const-ness">Handling const-ness</h2>
+<p>A most keen-eyed reader might have the following objection :</p>
+<blockquote>
+<p>The lambda we&rsquo;re using as storage has a mutable method, how are we going to manipulate a <code>const tuple</code>?</p>
+</blockquote>
+<p>Indeed, we can&rsquo;t invoke a non-const method on a const object, but we need to invoke our lambda to read our variables. So? So&hellip; we call the good old <code>const_cast</code> :biohazard:.  For example, here is how we can implement copy assignment :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Ts</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">tuple</span> <span class="p">{</span>
+	
+	<span class="c1">//...
+</span><span class="c1"></span>	
+	<span class="n">tuple</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span> <span class="n">tuple</span><span class="o">&amp;</span> <span class="n">other</span><span class="p">){</span>
+		<span class="n">apply</span><span class="p">(</span><span class="o">*</span><span class="k">this</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">other</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="p">...</span> <span class="n">this_elems</span><span class="p">)</span>
+		<span class="p">{</span>
+			<span class="c1">// uh, oh... const_cast!
+</span><span class="c1"></span>			<span class="n">apply</span><span class="p">(</span> <span class="k">const_cast</span><span class="o">&lt;</span><span class="n">tuple</span><span class="o">&amp;&gt;</span><span class="p">(</span><span class="n">other</span><span class="p">),</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">this_elems</span><span class="p">...]</span> <span class="p">(</span><span class="k">const</span> <span class="k">auto</span><span class="o">&amp;</span><span class="p">...</span> <span class="n">other_elems</span><span class="p">)</span>
+			<span class="p">{</span>
+				<span class="p">((</span><span class="n">this_elems</span> <span class="o">=</span> <span class="n">other_elems</span><span class="p">),</span> <span class="p">...);</span>
+			<span class="p">});</span>
+		<span class="p">});</span>
+		<span class="k">return</span> <span class="o">*</span><span class="k">this</span><span class="p">;</span>
+	<span class="p">}</span>
+	
+	<span class="c1">//...
+</span><span class="c1"></span><span class="p">};</span>
+</code></pre></div><p>As far as I&rsquo;m aware, this isn&rsquo;t undefined behavior : we&rsquo;re removing the const-qualifier, but we&rsquo;re never actually modifying <code>other</code>, so it&rsquo;s all good.</p>
+<p>But we need to provide an <code>apply</code> function that works with const tuples, so we must generalize this. We can do so by moving the implementation of <code>apply</code> into overloaded private methods :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp">
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Ts</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">tuple</span> <span class="p">{</span>
+	<span class="c1">// ...
+</span><span class="c1"></span>	<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Fn</span><span class="o">&gt;</span>
+	<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">m_apply</span><span class="p">(</span><span class="n">Fn</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span> <span class="k">const</span> <span class="o">&amp;</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="k">const_cast</span><span class="o">&lt;</span><span class="k">decltype</span><span class="p">(</span><span class="n">memfn</span><span class="p">)</span><span class="o">&amp;&gt;</span><span class="p">(</span><span class="n">memfn</span><span class="p">)(</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">fn</span><span class="p">]</span> <span class="p">(</span><span class="k">const</span> <span class="k">auto</span><span class="o">&amp;</span><span class="p">...</span> <span class="n">elems</span><span class="p">)</span>
+			<span class="o">-&gt;</span> <span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> 
+		<span class="p">{</span>
+			<span class="k">return</span> <span class="nf">fn</span><span class="p">(</span><span class="n">elems</span><span class="p">...);</span>
+		<span class="p">});</span>
+	<span class="p">}</span>
+	
+	<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Fn</span><span class="o">&gt;</span>
+	<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">m_apply</span><span class="p">(</span><span class="n">Fn</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nf">memfn</span><span class="p">(</span><span class="n">fn</span><span class="p">);</span>
+	<span class="p">}</span>
+	
+	<span class="c1">// rvalue reference overload...
+</span><span class="c1"></span><span class="p">};</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Self</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Fn</span><span class="o">&gt;</span>
+<span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">apply</span><span class="p">(</span><span class="n">Self</span><span class="o">&amp;&amp;</span> <span class="n">self</span><span class="p">,</span> <span class="n">Fn</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">){</span>
+	<span class="k">return</span> <span class="n">std</span><span class="o">::</span><span class="n">forward</span><span class="o">&lt;</span><span class="n">Self</span><span class="o">&gt;</span><span class="p">(</span><span class="n">self</span><span class="p">).</span><span class="n">memfn</span><span class="p">(</span><span class="n">fn</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div><p>Despite removing the const qualifier on the member lambda, the elements are always passed as const to the incoming function. We can now safely call <code>apply</code> on any tuples, const or not. Note that the <code>std::forward</code> in apply is necessary to call the (unwritten) rvalue reference overload (needed for getting a rvalue ref out of a moved tuple).</p>
+<h2 id="tuple-concatenation">Tuple Concatenation</h2>
+<p>We now want to concatenate our tuples. Let&rsquo;s start with the simplest case, concatenating 2 tuples :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">A</span><span class="p">,</span> <span class="k">class</span> <span class="nc">B</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">tuple_cat</span><span class="p">(</span><span class="n">A</span><span class="o">&amp;&amp;</span> <span class="n">a</span><span class="p">,</span> <span class="n">B</span><span class="o">&amp;&amp;</span> <span class="n">b</span><span class="p">){</span>
+    <span class="k">return</span> <span class="nf">apply</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">a</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">b_mem</span><span class="p">)</span> 
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">apply</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">b_mem</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">a_mem</span><span class="p">)</span> 
+        <span class="p">{</span>
+            <span class="k">return</span> <span class="n">list_cat_t</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">A</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">B</span><span class="o">&gt;&gt;</span><span class="p">(</span> <span class="n">a_mem</span><span class="p">...,</span> <span class="n">b_mem</span><span class="p">...</span> <span class="p">);</span>
+        <span class="p">});</span>
+    <span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div><p>Hold up, <code>list_cat_t</code>? Why, where do this comes from? Well, the thing is that we can&rsquo;t deduce our return type from <code>a_mem</code> and <code>b_mem</code>, else we&rsquo;re probably going to grab const/ref qualifiers along and deduce the wrong type, and we can&rsquo;t just apply <code>std::remove_cvref</code> to our types either, because our tuples might legitimately contains references.</p>
+<p>So we need a little helper to concatenate &ldquo;types list&rdquo; :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="nc">list_cat</span><span class="p">;</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">...</span><span class="o">&gt;</span> <span class="k">class</span> <span class="nc">W</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Ts</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="nc">list_cat</span><span class="o">&lt;</span><span class="n">W</span><span class="o">&lt;</span><span class="n">Ts</span><span class="p">...</span><span class="o">&gt;&gt;</span><span class="p">{</span>
+    <span class="k">using</span> <span class="n">type</span> <span class="o">=</span> <span class="n">W</span><span class="o">&lt;</span><span class="n">Ts</span><span class="p">...</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">...</span><span class="o">&gt;</span> <span class="k">class</span> <span class="nc">WA</span><span class="p">,</span> <span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">...</span><span class="o">&gt;</span> <span class="k">class</span> <span class="nc">WB</span><span class="p">,</span> 
+          <span class="k">class</span><span class="err">... </span><span class="nc">As</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Bs</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Rest</span><span class="o">&gt;</span>
+<span class="k">struct</span> <span class="nc">list_cat</span><span class="o">&lt;</span><span class="n">WA</span><span class="o">&lt;</span><span class="n">As</span><span class="p">...</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">WB</span><span class="o">&lt;</span><span class="n">Bs</span><span class="p">...</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">Rest</span><span class="p">...</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">using</span> <span class="n">type</span> <span class="o">=</span> <span class="k">typename</span> <span class="n">list_cat</span><span class="o">&lt;</span><span class="n">WA</span><span class="o">&lt;</span><span class="n">As</span><span class="p">...,</span> <span class="n">Bs</span><span class="p">...</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">Rest</span><span class="p">...</span><span class="o">&gt;::</span><span class="n">type</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
+<span class="k">using</span> <span class="n">list_cat_t</span> <span class="o">=</span> <span class="k">typename</span> <span class="n">list_cat</span><span class="o">&lt;</span><span class="n">Args</span><span class="p">...</span><span class="o">&gt;::</span><span class="n">type</span><span class="p">;</span>
+</code></pre></div><p>All these chevrons aren&rsquo;t too easy on the eyes, but this does the job :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">using</span> <span class="n">res</span> <span class="o">=</span> <span class="n">list_cat_t</span><span class="o">&lt;</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span> <span class="kt">float</span><span class="p">,</span> <span class="kt">char</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tuple</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">,</span> <span class="kt">float</span><span class="o">&amp;&amp;&gt;</span><span class="p">,</span> <span class="n">tuple</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">*&gt;&gt;</span><span class="p">;</span>
+<span class="k">static_assert</span><span class="p">(</span> <span class="n">std</span><span class="o">::</span><span class="n">is_same_v</span><span class="o">&lt;</span><span class="n">res</span><span class="p">,</span> <span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span> <span class="kt">float</span><span class="p">,</span> <span class="kt">char</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">,</span> <span class="kt">float</span><span class="o">&amp;&amp;</span><span class="p">,</span> <span class="kt">char</span><span class="o">*&gt;&gt;</span> <span class="p">);</span>
+</code></pre></div><p>And we can easily generalize this function to N tuples :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">A</span><span class="p">,</span> <span class="k">class</span> <span class="nc">B</span><span class="p">,</span> <span class="k">class</span> <span class="nc">C</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Tuples</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">tuple_cat</span><span class="p">(</span><span class="n">A</span><span class="o">&amp;&amp;</span> <span class="n">a</span><span class="p">,</span> <span class="n">B</span><span class="o">&amp;&amp;</span> <span class="n">b</span><span class="p">,</span> <span class="n">C</span><span class="o">&amp;&amp;</span> <span class="n">c</span><span class="p">,</span> <span class="n">Tuples</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">tuples</span><span class="p">){</span>
+	<span class="k">return</span> <span class="nf">tuple_cat</span><span class="p">(</span><span class="n">tuple_cat</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">c</span><span class="p">,</span> <span class="n">tuples</span><span class="p">...);</span>
+<span class="p">}</span>
+</code></pre></div><p>But we can do better than this : this code instantiate N-1 tuple types for a concatenation of N tuples (and  it also creates temporary objects). Instantiating types is expensive for the compiler, so it would be nice if we could reduce that number to 1.</p>
+<p>In pseudo-code, the variadic case can be written as :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">auto</span> <span class="nf">tuple_cat</span><span class="p">(</span><span class="n">Pack</span><span class="p">...</span> <span class="n">pack</span><span class="p">){</span>
+	<span class="k">return</span> <span class="n">apply</span><span class="p">(</span> <span class="n">pack</span><span class="p">[</span><span class="n">end</span><span class="p">],</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">]</span> <span class="p">(</span><span class="n">pack</span><span class="p">[</span><span class="n">end</span><span class="p">].</span><span class="n">members</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="n">apply</span><span class="p">(</span> <span class="n">pack</span><span class="p">[</span><span class="n">end</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pack</span><span class="p">[</span><span class="n">end</span><span class="p">].</span><span class="n">members</span><span class="p">]</span> <span class="p">(</span><span class="n">pack</span><span class="p">[</span><span class="n">end</span><span class="o">-</span><span class="mi">1</span><span class="p">].</span><span class="n">members</span><span class="p">)</span> <span class="p">{</span>
+			
+			<span class="c1">// until...
+</span><span class="c1"></span>			<span class="k">return</span> <span class="n">apply</span><span class="p">(</span> <span class="n">pack</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">[</span><span class="mf">1.</span><span class="p">..</span><span class="n">end</span><span class="p">].</span><span class="n">members</span><span class="p">]</span> <span class="p">(</span><span class="n">pack</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">members</span><span class="p">...)</span> <span class="p">{</span>
+				<span class="k">return</span> <span class="n">ReturnType</span><span class="p">{</span> <span class="n">pack</span><span class="p">[</span><span class="mf">0.</span><span class="p">..</span><span class="n">end</span><span class="p">].</span><span class="n">members</span><span class="p">...</span> <span class="p">};</span>
+			<span class="p">});</span>
+		<span class="p">});</span>
+	<span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div><p>But we can&rsquo;t just unroll a pack like that, so we need to transform this into a recursive form (in C++ this time) :</p>
+<div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Builder</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">tuple_cat_tail</span><span class="p">(</span><span class="n">Builder</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">){</span>
+	<span class="k">return</span> <span class="nf">fn</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Builder</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Head</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Tail</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">tuple_cat_tail</span><span class="p">(</span><span class="n">Builder</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">,</span> <span class="n">Head</span><span class="o">&amp;&amp;</span> <span class="n">head</span><span class="p">,</span> <span class="n">Tail</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">tail</span><span class="p">){</span>
+	<span class="k">return</span> <span class="nf">tuple_cat_tail</span><span class="p">(</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">fn</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">head</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">pack</span><span class="p">)</span> 
+	<span class="p">{</span>
+		<span class="k">return</span> <span class="n">apply</span><span class="p">(</span><span class="n">head</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">head_mem</span><span class="p">)</span> <span class="p">{</span>
+			<span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="n">head_mem</span><span class="p">...,</span> <span class="n">pack</span><span class="p">...);</span>
+		<span class="p">});</span>
+	<span class="p">},</span> <span class="n">tail</span><span class="p">...</span> <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">A</span><span class="p">,</span> <span class="k">class</span> <span class="nc">B</span><span class="p">,</span> <span class="k">class</span><span class="err">... </span><span class="nc">Tail</span><span class="o">&gt;</span>
+<span class="k">auto</span> <span class="n">tuple_cat</span><span class="p">(</span><span class="n">A</span><span class="o">&amp;&amp;</span> <span class="n">a</span><span class="p">,</span> <span class="n">B</span><span class="o">&amp;&amp;</span> <span class="n">b</span><span class="p">,</span> <span class="n">Tail</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">tail</span><span class="p">){</span>
+	<span class="k">using</span> <span class="n">ReturnType</span> <span class="o">=</span> <span class="n">list_cat_t</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">A</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">B</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">decay_t</span><span class="o">&lt;</span><span class="n">Tail</span><span class="o">&gt;</span><span class="p">...</span><span class="o">&gt;</span><span class="p">;</span>
+	<span class="k">return</span> <span class="nf">tuple_cat_tail</span><span class="p">(</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">a</span><span class="p">]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">pack</span><span class="p">)</span> <span class="p">{</span>
+		<span class="n">apply</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">pack</span><span class="p">...]</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;&amp;</span><span class="p">...</span> <span class="n">a_mem</span> <span class="p">)</span> <span class="p">{</span>
+			<span class="k">return</span> <span class="n">ReturnType</span><span class="p">{</span><span class="n">a_mem</span><span class="p">...,</span> <span class="n">pack</span><span class="p">...);</span>
+		<span class="p">});</span>
+	<span class="p">},</span>  <span class="n">b</span><span class="p">,</span> <span class="n">tail</span><span class="p">...</span> <span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div><p>This C++ code does exactly the same thing as the pseudo-code above. The first call to <code>tuple_cat</code> construct the final call that will build the resulting tuple, using the members of A and the members of the rest of the arguments, then, each call of <code>tuple_cat_tail</code> will &ldquo;decorate&rdquo; the builder function Fn with another function which unwrap the members of head and put them into the arguments list of Fn. Finally, once the size of tail is 0, the first function <code>tuple_cat_tail</code>, which simply return the invocation of the builder function, will be called, and that&rsquo;s where we get our tuple.</p>
+<p>Interestingly, this code is <em>a lot</em> faster to compile than the preceding implementation : about 3 times faster in debug mode, and 40% faster in release mode (see next section). This isn&rsquo;t entirely surprising : while we are constructing a lot of lambdas, this is still a lot easier on the compiler than instantiating intermediates classes (instantiating a class means allocating storage for/parsing the methods, type alias, etc, whereas a lambda has a single method).</p>
+<h2 id="compile-time-benchmark">Compile time benchmark</h2>
+<p>After adding all the necessary constructors/operators to make this tuple not too far from standard conforming, the entire implementation is about <em>300 lines long</em>, which is very short. I knew this would compile a lot faster than <code>std::tuple</code>, but I wanted the numbers, so I ran some benchmarks. I also included the <a href="https://github.com/taocpp/tuple">taocpp</a> implementation, which AFAIK is the fastest to compile. The code for the test come from the taocpp repo, and essentially consist in a lot of concatenations, culminating into a tuple of 265 elements.</p>
+<p>All numbers are from Clang/GCC -ftime-report wall time, compiled with -std=c++2a (I ran each test about ten times and averaged, not exactly a rigorous statistical analysis, but the standard dev was pretty low). Only the respective headers have been included in the test file, one at a time, and nothing else.</p>
+<hr>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">&mdash; Build &mdash;</th>
+<th style="text-align:center">&mdash; std::tuple &mdash;</th>
+<th style="text-align:center">&mdash;tao::tuple&mdash;</th>
+<th style="text-align:center">&mdash; swl::tuple (tuple_cat v1) &mdash;</th>
+<th style="text-align:center">.. (tuple_cat v2) &mdash;</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">clang -O0</td>
+<td style="text-align:center">11.84 s</td>
+<td style="text-align:center">3.57 s</td>
+<td style="text-align:center">1.43 s</td>
+<td style="text-align:center">0.53 s</td>
+</tr>
+<tr>
+<td style="text-align:center">clang -O3</td>
+<td style="text-align:center">17.24 s</td>
+<td style="text-align:center">4.27 s</td>
+<td style="text-align:center">3.5 s</td>
+<td style="text-align:center">2.25 s</td>
+</tr>
+<tr>
+<td style="text-align:center">gcc -O0</td>
+<td style="text-align:center">26.95 s</td>
+<td style="text-align:center">9.8 s</td>
+<td style="text-align:center">3.83 s</td>
+<td style="text-align:center">1.33 s</td>
+</tr>
+<tr>
+<td style="text-align:center">gcc -O3</td>
+<td style="text-align:center">36.22 s</td>
+<td style="text-align:center">10.5 s</td>
+<td style="text-align:center">6.11 s</td>
+<td style="text-align:center">2.16 s</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p>As you can see, <code>swl::tuple tuple_cat_v2</code> compiles 2 to 7 times faster than <code>tao::tuple</code>, and faster than the std by&hellip; a lot. GCC doesn&rsquo;t performs very well on this kind of code, as it seems to be significantly slower on every test, except <code>swl::tuple tuple_cat_v2</code> with -O3.</p>
+<p>Conclusion :</p>
+<ul>
+<li>a tuple can be implemented with a lambda easily</li>
+<li>if you&rsquo;re making a lot of concatenations with <code>std::tuple</code> (or boost etc) in your code, stop and use another implementation</li>
+<li>GCC doesn&rsquo;t handle template meta-programming very well</li>
+</ul>
+<p>The source code for <code>swl::tuple</code> can be found at [link]. It&rsquo;s not standard conforming yet, so if you want a fast tuple, use taocpp instead.</p>
+<p>PS : Unlike the apply function used in this article, <code>std::apply</code> take the function first, which is IMO harder to read.</p>
+
+
+		
+	</div>
+
+	<div class="pagination">
+
+		<a href="#" class="top">Top</a>
+	</div>
+</main>
+
+
+        		<footer>
+			
+			<span>
+			&copy; <time datetime="2021-02-01 15:55:49.110126 &#43;0100 CET m=&#43;0.129645602">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
+			</span>
+		</footer>
+
+    </body>
+</html>
