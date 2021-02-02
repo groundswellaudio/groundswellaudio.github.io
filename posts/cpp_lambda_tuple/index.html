@@ -159,7 +159,7 @@ reference from our tuple, so I kept it.</p>
 <span class="kt">float</span> <span class="n">b</span> <span class="o">=</span> <span class="mf">5.f</span><span class="p">;</span>
 <span class="n">tuple</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&amp;</span><span class="p">,</span> <span class="kt">float</span><span class="o">&amp;&gt;</span> <span class="n">tpl</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">);</span>
 
-<span class="n">tpl</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">();</span> <span class="o">=</span> <span class="mi">314</span><span class="p">;</span>
+<span class="n">tpl</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">()</span> <span class="o">=</span> <span class="mi">314</span><span class="p">;</span>
 <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">a</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; &#34;</span> <span class="o">&lt;&lt;</span> <span class="n">tpl</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">();</span>
 </code></pre></div><p>This code outputs <code>3 314</code>, which is not what we want. To understand why, let&rsquo;s look at the definition of <code>make_lambda_tuple</code>:</p>
 <div class="highlight"><pre class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="err">... </span><span class="nc">Args</span><span class="o">&gt;</span>
@@ -229,7 +229,7 @@ reference from our tuple, so I kept it.</p>
 <span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">Self</span><span class="p">,</span> <span class="k">class</span> <span class="nc">Fn</span><span class="o">&gt;</span>
 <span class="k">decltype</span><span class="p">(</span><span class="k">auto</span><span class="p">)</span> <span class="n">apply</span><span class="p">(</span><span class="n">Self</span><span class="o">&amp;&amp;</span> <span class="n">self</span><span class="p">,</span> <span class="n">Fn</span><span class="o">&amp;&amp;</span> <span class="n">fn</span><span class="p">)</span>
 <span class="p">{</span>
-	<span class="k">return</span> <span class="nf">decltype</span><span class="p">(</span><span class="n">self</span><span class="p">)(</span><span class="n">self</span><span class="p">).</span><span class="n">memfn</span><span class="p">(</span><span class="n">fn</span><span class="p">);</span>
+	<span class="k">return</span> <span class="nf">decltype</span><span class="p">(</span><span class="n">self</span><span class="p">)(</span><span class="n">self</span><span class="p">).</span><span class="n">m_apply</span><span class="p">(</span><span class="n">fn</span><span class="p">);</span>
 <span class="p">}</span>
 </code></pre></div><p>Despite removing the const qualifier on the member lambda, the elements are always passed as const to the incoming function. We can now safely call <code>apply</code> on any tuples, const or not. Note that the forwarding in apply is necessary to call the (unwritten) rvalue reference overload (needed for getting a rvalue ref out of a moved tuple).</p>
 <h2 id="tuple-concatenation">Tuple Concatenation</h2>
@@ -394,7 +394,7 @@ reference from our tuple, so I kept it.</p>
         		<footer>
 			
 			<span>
-			&copy; <time datetime="2021-02-02 15:23:59.825751 &#43;0100 CET m=&#43;0.141054461">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
+			&copy; <time datetime="2021-02-02 16:17:48.038227 &#43;0100 CET m=&#43;0.118887941">2021</time> . Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
 			</span>
 		</footer>
 
